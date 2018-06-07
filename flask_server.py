@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
-from flask_cors import CORS
-from flask_socketio import SocketIO, send, emit
+from flask_cors import CORS, cross_origin
+from flask_socketio import SocketIO
 
 from uuid import uuid4
 from blockchain import blockchain
@@ -18,19 +18,21 @@ node_identifier = str(uuid4()).replace('-', '')
 def mine():
     # We run the proof of work algorithm to get the next proof...
     last_block = blockchain.last_block
-    proof = blockchain.proof_of_work(last_block)
+    proof, mined_hash = blockchain.proof_of_work(last_block)
+
+    socketio.emit('lose_mine', {"lose": True}, broadcast=True)
 
     # We must receive a reward for finding the proof.
     # The sender is "0" to signify that this node has mined a new coin.
     blockchain.new_transaction(
-        sender="0",
+        sender=node_identifier,
         recipient=node_identifier,
         amount=1,
     )
 
     # Forge the new Block by adding it to the chain
     previous_hash = blockchain.hash(last_block)
-    block = blockchain.new_block(proof, previous_hash)
+    block = blockchain.new_block(proof, mined_hash, previous_hash, node_identifier)
 
     response = {
         'message': "New Block Forged",
@@ -120,16 +122,19 @@ def client_mine():
 def block_verify():
     data = request.get_json()
 
-    proof = data['proof']
-    mined_hash = data['mined_hash']
-    previous_hash = blockchain.hash(blockchain.last_block)
-    miner = request.cookies.get('miner')
+    print(data)
 
-    if mined_hash[:3] == "0000":
+    proof = data['proof']
+    mined_hash = data['hash']
+    miner = data['miner']
+
+    previous_hash = blockchain.hash(blockchain.last_block)
+
+    if mined_hash[:4] == "0000":
         blockchain.new_transaction(sender=node_identifier, recipient=miner, amount=5)
         new_block = blockchain.new_block(proof, mined_hash, previous_hash, miner)
 
-        emit('lose_mine', {"lose": True}, broadcast=True)
+        socketio.emit('lose_mine', {"lose": True}, broadcast=True)
 
         response = {
             "verify": True,

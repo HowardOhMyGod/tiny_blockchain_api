@@ -171,7 +171,10 @@ class Blockchain:
         while self.valid_proof(last_proof, proof, last_hash) is False:
             proof += 1
 
-        return proof
+        guess = f'{last_proof}{proof}{last_hash}'.encode()
+        mined_hash = hashlib.sha256(guess).hexdigest()
+
+        return proof, mined_hash
 
     @staticmethod
     def valid_proof(last_proof, proof, last_hash):
