@@ -5,6 +5,9 @@ from flask_socketio import SocketIO
 from uuid import uuid4
 from blockchain import blockchain
 
+from reg_var import Register
+from reg_var import Sign
+from reg_var import Verify
 
 # Instantiate the Node
 app = Flask(__name__)
@@ -148,6 +151,53 @@ def block_verify():
 
     return jsonify(response), 200
 
+@app.route('/new_wallet', methods=['POST'])
+def new_wallet():
+    value = request.get_json()
+    pid = value['data']
+
+    if pid is None:
+        return "Error: Please supply a valid list of nodes", 400
+    else:
+        register = Register(pid)
+        register.new_wallet()
+
+        response = {
+            'public_key':register.wallet_address,
+            'private_key':register.private_key,
+            'message':'Please save your key carefully.'
+        }
+        return jsonify(response), 200
+
+@app.route('/transactions/sign', methods=['POST'])
+def sign():
+    values = request.get_json()
+
+    required = ['private_key','transaction']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+
+    sign = Sign(values['private_key'],values['transaction'])
+    
+    response = {
+        'cipher':sign.sign()
+    }
+    return jsonify(response), 200
+
+@app.route('/transactions/verify', methods=['POST'])
+def verify():
+    values = request.get_json()
+
+    required = ['wallet_address','transaction','cipher']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+
+    verify = Verify(values['wallet_address'],values['transaction'],values['cipher'])
+
+    response = {
+        'result':verify.verify()
+    }
+    return jsonify(response), 200
 
 
 if __name__ == '__main__':

@@ -9,6 +9,8 @@ Flask = "==0.12.2"
 flask-socketio = "*"
 eventlet = "*"
 flask-cors = "*"
+pycrypto = "*"
+pymysql = "*"
 
 [dev-packages]
 
