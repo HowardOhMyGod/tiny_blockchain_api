@@ -1,5 +1,6 @@
 import hashlib
 import json
+import functools, operator
 from time import time
 
 import requests
@@ -197,11 +198,18 @@ class Blockchain:
         transactions_list = list(map(lambda block: block['transactions'], blocks))
 
         addr_trans = []
+        saving = 0
 
         for transactions in transactions_list:
             addr_trans += list(filter(lambda tran: tran['sender'] == addr or tran['recipient'] == addr, transactions))
 
-        return addr_trans
+        for tran in addr_trans:
+            if tran['sender'] == addr:
+                saving -= tran['amount']
+            elif tran['recipient'] == addr:
+                saving += tran['amount']
+
+        return addr_trans, saving
 
 # Instantiate the Blockchain
 blockchain = Blockchain()

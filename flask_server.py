@@ -208,10 +208,12 @@ def search_address():
     if address is None:
         return "Error: Please supply a valid address", 400
 
-    result = blockchain.find_wallet(address)
+    addr_trans, saving = blockchain.find_wallet(address)
 
     response = {
-        'result': result
+        'address': address,
+        'result': addr_trans,
+        'saving': saving
     }
 
     return jsonify(response), 200
