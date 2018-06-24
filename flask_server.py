@@ -200,6 +200,23 @@ def verify():
     return jsonify(response), 200
 
 
+@app.route('/wallet/transactions', methods=['POST'])
+def search_address():
+    values = request.get_json()
+
+    address = values.get('address')
+    if address is None:
+        return "Error: Please supply a valid address", 400
+
+    result = blockchain.find_wallet(address)
+
+    response = {
+        'result': result
+    }
+
+    return jsonify(response), 200
+
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 

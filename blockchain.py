@@ -192,5 +192,16 @@ class Blockchain:
         guess_hash = hashlib.sha256(guess).hexdigest()
         return guess_hash[:4] == "0000"
 
+    def find_wallet(self, addr):
+        blocks = list(filter(lambda block: len(block['transactions']) > 0, self.chain))
+        transactions_list = list(map(lambda block: block['transactions'], blocks))
+
+        addr_trans = []
+
+        for transactions in transactions_list:
+            addr_trans += list(filter(lambda tran: tran['sender'] == addr or tran['recipient'] == addr, transactions))
+
+        return addr_trans
+
 # Instantiate the Blockchain
 blockchain = Blockchain()
