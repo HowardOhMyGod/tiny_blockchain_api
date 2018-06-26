@@ -53,6 +53,10 @@ def transfer():
     if not all(k in values for k in required):
         return 'Missing values', 400
 
+    # check the tranfer amount > 0
+    if values['amount'] <= 0:
+        return jsonify({'error': True, 'errMsg': 'Invalid Amount'}), 400
+
     # check recipient is valid
     recipient = User(values['recipient'])
     recipient_addr = recipient.verify()
