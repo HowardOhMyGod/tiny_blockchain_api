@@ -1,6 +1,5 @@
 import hashlib
 import json
-import functools, operator
 from time import time
 
 import requests

@@ -5,9 +5,7 @@ from flask_socketio import SocketIO
 from uuid import uuid4
 from blockchain import blockchain
 
-from reg_var import Register
-from reg_var import Sign
-from reg_var import Verify
+from reg_var import Register, Sign, Verify, User
 
 # Instantiate the Node
 app = Flask(__name__)
@@ -46,20 +44,58 @@ def mine():
     }
     return jsonify(response), 200
 
-
-@app.route('/transactions/new', methods=['POST'])
-def new_transaction():
+@app.route('/transfer', methods=['POST'])
+def transfer():
     values = request.get_json()
 
     # Check that the required fields are in the POST'ed data
-    required = ['sender', 'recipient', 'amount']
+    required = ['recipient', 'amount', 'wallet_address']
     if not all(k in values for k in required):
         return 'Missing values', 400
 
-    # Create a new Transaction
-    index = blockchain.new_transaction(values['sender'], values['recipient'], values['amount'])
+    # check recipient is valid
+    recipient = User(values['recipient'])
+    recipient_addr = recipient.verify()
 
+    if not recipient_addr:
+        return jsonify({'error': True, 'errMsg': 'Account not exist'}), 401
+
+    # check sender's saving
+    addr_trans, saving = blockchain.find_wallet(values['wallet_address'])
+    if saving < values['amount']:
+        return jsonify({'error': True, 'errMsg': 'Not enough money.'})
+
+
+    # generate new transaction
+    transaction = {
+        'sender': values['wallet_address'],
+        'recipient': recipient_addr,
+        'amount': values['amount']
+    }
+
+    # sign the transaction
+    sign = Sign(values['wallet_address'], transaction)
+    cipher = sign.sign()
+
+    # if can't sign the transaction
+    if not cipher:
+        return jsonify({'error': True, 'errMsg': 'Cannot sign transaction'}), 401
+
+    # verify the signature
+    verify = Verify(values['wallet_address'], transaction, cipher)
+    result = verify.verify()
+
+    # verify failed
+    if not result:
+        return jsonify({'error': True, 'errMsg': 'Signature Verify Fail'}), 401
+
+    # verify successfully
+    index = blockchain.new_transaction(values['wallet_address'], recipient_addr, values['amount'])
     response = {'message': f'Transaction will be added to Block {index}'}
+
+    # broadcast new transaction to all miners online
+    socketio.emit('new_transaction', 'new transaction', broadcast=True)
+
     return jsonify(response), 201
 
 
@@ -169,20 +205,53 @@ def new_wallet():
         }
         return jsonify(response), 200
 
+@app.route('/login', methods=['POST'])
+def login():
+    value = request.get_json()
+
+    if 'pid' not in value:
+        return 'Missing values', 400
+
+    user = User(value['pid'])
+    result = user.verify()
+
+    if result:
+        response = {
+            'login': True,
+            'wallet_address': result
+        }
+
+        return jsonify(response), 200
+
+    response = {
+        'login': False
+    }
+
+    return jsonify(response), 401
+
+
 @app.route('/transactions/sign', methods=['POST'])
 def sign():
     values = request.get_json()
 
-    required = ['private_key','transaction']
+    required = ['pid', 'transaction']
+
     if not all(k in values for k in required):
         return 'Missing values', 400
 
-    sign = Sign(values['private_key'],values['transaction'])
-    
-    response = {
-        'cipher':sign.sign()
-    }
-    return jsonify(response), 200
+    sign = Sign(values['pid'],values['transaction'])
+    cipher = sign.sign()
+
+    if cipher:
+        response = {
+            'cipher':sign.sign()
+        }
+
+        return jsonify(response), 200
+    else:
+        return 401
+
+
 
 @app.route('/transactions/verify', methods=['POST'])
 def verify():
