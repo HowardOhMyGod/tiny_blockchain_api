@@ -57,12 +57,16 @@ def transfer():
     if values['amount'] <= 0:
         return jsonify({'error': True, 'errMsg': 'Invalid Amount'}), 400
 
-    # check recipient is valid
+    # check if the account exist
     recipient = User(values['recipient'])
     recipient_addr = recipient.verify()
 
     if not recipient_addr:
         return jsonify({'error': True, 'errMsg': 'Account not exist'}), 401
+
+    # check sender and recipient is not the same
+    if values['wallet_address'] == recipient_addr:
+        return jsonify({'error': True, 'errMsg': 'Sender and Recipient should not be the same'})
 
     # check sender's saving
     addr_trans, saving = blockchain.find_wallet(values['wallet_address'])
@@ -165,16 +169,25 @@ def client_mine():
 def block_verify():
     data = request.get_json()
 
-    print(data)
-
     proof = data['proof']
     mined_hash = data['hash']
     miner = data['miner']
 
-    previous_hash = blockchain.hash(blockchain.last_block)
+    # transaction list must be non-empty
+    if len(blockchain.chain) > 3 and len(blockchain.current_transactions) <= 0:
+        return jsonify({'verify': False, 'errMsg': 'There is no transaction right now'}), 200
+
+    # block hash size is 256 bit -> 32 bytes
+    if len(mined_hash) != 64:
+        return jsonify({'verify': False, 'errMsg': 'Invalid hash'}), 200
+
+    # duplicate block
+    if blockchain.duplicate_block(mined_hash):
+        return jsonify({'verify': False, 'errMsg': 'Duplicate Block'}), 200
 
     if mined_hash[:4] == "0000":
         blockchain.new_transaction(sender=node_identifier, recipient=miner, amount=5)
+        previous_hash = blockchain.hash(blockchain.last_block)
         new_block = blockchain.new_block(proof, mined_hash, previous_hash, miner)
 
         socketio.emit('lose_mine', {"lose": True}, broadcast=True)
@@ -186,7 +199,8 @@ def block_verify():
         }
     else:
         response = {
-            "verify": False
+            "verify": False,
+            'errMsg': 'Invalid hash'
         }
 
     return jsonify(response), 200
@@ -232,45 +246,6 @@ def login():
     }
 
     return jsonify(response), 401
-
-
-@app.route('/transactions/sign', methods=['POST'])
-def sign():
-    values = request.get_json()
-
-    required = ['pid', 'transaction']
-
-    if not all(k in values for k in required):
-        return 'Missing values', 400
-
-    sign = Sign(values['pid'],values['transaction'])
-    cipher = sign.sign()
-
-    if cipher:
-        response = {
-            'cipher':sign.sign()
-        }
-
-        return jsonify(response), 200
-    else:
-        return 401
-
-
-
-@app.route('/transactions/verify', methods=['POST'])
-def verify():
-    values = request.get_json()
-
-    required = ['wallet_address','transaction','cipher']
-    if not all(k in values for k in required):
-        return 'Missing values', 400
-
-    verify = Verify(values['wallet_address'],values['transaction'],values['cipher'])
-
-    response = {
-        'result':verify.verify()
-    }
-    return jsonify(response), 200
 
 
 @app.route('/wallet/transactions', methods=['POST'])

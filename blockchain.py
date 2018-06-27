@@ -210,5 +210,10 @@ class Blockchain:
 
         return addr_trans, saving
 
+    def duplicate_block(self, hash):
+        result = list(filter(lambda block: block['hash'] == hash, self.chain))
+
+        return len(result) > 0
+
 # Instantiate the Blockchain
 blockchain = Blockchain()
